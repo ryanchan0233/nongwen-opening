@@ -776,31 +776,46 @@
             </div>
         </div>
     </div>
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCpcykgSAaAPotWMsBixZBuna5C9xAnR4c",
+            authDomain: "nongwen-opening.firebaseapp.com",
+            projectId: "nongwen-opening",
+            storageBucket: "nongwen-opening.firebasestorage.app",
+            messagingSenderId: "1016102293410",
+            appId: "1:1016102293410:web:88d73f3ba4114e52cb2cfb",
+            measurementId: "G-Q65VEDYB5M"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const basketsCollection = collection(db, "baskets");
+
         const brandColors = ['#edecde', '#c9a86c', '#9d7354', '#d4a574', '#e8dcc8'];
         const basketIcons = ['flower1.jpg', 'flower2.jpg', 'flower3.jpg', 'flower4.jpg', 'flower5.jpg', 'flower6.jpg'];
         let danmakuCount = 0, basketCount = 0;
-        const baskets = [];
+        let baskets = [];
         const maxBasketsPerRow = window.innerWidth < 768 ? 4 : 6;
         
         function initBaskets() {
-            const sampleBaskets = [
-                { name: '张三', message: '生意兴隆，财源广进！', icon: '🎋' },
-                { name: '李四', message: '开业大吉，客似云来！', icon: '🌿' },
-                { name: '王五', message: '红红火火，蒸蒸日上！', icon: '🎍' },
-                { name: '赵六', message: '万事如意，事业有成！', icon: '🏮' },
-                { name: '钱七', message: '招财进宝，富贵吉祥！', icon: '🎊' },
-                { name: '孙八', message: '前程似锦，大展宏图！', icon: '🎉' }
-            ];
-            sampleBaskets.forEach(b => addBasketToData(b.name, b.message, b.icon));
-            renderBaskets();
+            onSnapshot(basketsCollection, (snapshot) => {
+                baskets = [];
+                snapshot.forEach((doc) => {
+                    baskets.push({ id: doc.id, ...doc.data() });
+                });
+                basketCount = baskets.length;
+                updateStats();
+                renderBaskets();
+            });
         }
         
-        function addBasketToData(name, message, icon) {
+        async function addBasketToData(name, message, icon) {
             const timeStr = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-            baskets.push({ name, message, icon: icon || basketIcons[Math.floor(Math.random() * basketIcons.length)], time: timeStr });
-            basketCount++;
-            updateStats();
+            const basketData = { name, message, icon: icon || basketIcons[Math.floor(Math.random() * basketIcons.length)], time: timeStr, timestamp: Date.now() };
+            await addDoc(basketsCollection, basketData);
         }
         
         function renderBaskets() {
@@ -826,13 +841,12 @@
             });
         }
         
-        function deleteBasket(index) {
+        async function deleteBasket(index) {
             if (confirm('确定要删除这个花篮吗？')) {
-                baskets.splice(index, 1);
-                basketCount--;
-                updateStats();
-                renderBaskets();
-                renderBasketList();
+                const basket = baskets[index];
+                if (basket.id) {
+                    await deleteDoc(doc(db, "baskets", basket.id));
+                }
             }
         }
         
@@ -869,14 +883,15 @@
             document.getElementById('editModal').classList.remove('active');
         }
         
-        function saveEdit() {
+        async function saveEdit() {
             const index = parseInt(document.getElementById('editIndex').value);
             const name = document.getElementById('editName').value.trim();
             const message = document.getElementById('editMessage').value.trim();
             if (!name || !message) { alert('请填写完整信息'); return; }
-            baskets[index].name = name;
-            baskets[index].message = message;
-            renderBaskets();
+            const basket = baskets[index];
+            if (basket.id) {
+                await updateDoc(doc(db, "baskets", basket.id), { name, message });
+            }
             closeEditModal();
         }
         
